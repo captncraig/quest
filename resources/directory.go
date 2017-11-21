@@ -6,11 +6,15 @@ import (
 	"strings"
 
 	"github.com/captncraig/quest/log"
+	"github.com/captncraig/quest/logic"
 )
 
 type IndexEntry struct {
-	VolNum byte
-	Offset uint32
+	VolNum    byte
+	Offset    uint32
+	RawData   []byte // only populated if fully loaded
+	LoadError error
+	Data      interface{}
 }
 
 type Directory struct {
@@ -26,7 +30,6 @@ type Directory struct {
 }
 
 func LoadGameInfo(l Loader) (*Directory, error) {
-
 	dir := &Directory{l: l}
 	dir.AgiVersion, dir.LongAgiVersion = readVersionFromAgiDataOvl(l)
 	if dir.AgiVersion == 0 {
@@ -52,6 +55,55 @@ func LoadGameInfo(l Loader) (*Directory, error) {
 		return nil, err
 	}
 	return dir, nil
+}
+
+func (d *Directory) LoadAllResources() error {
+	var load = func(idx []*IndexEntry, f func([]byte) (interface{}, error)) {
+		for _, entry := range idx {
+			if entry == nil {
+				continue
+			}
+			vol, err := d.loadVolume(entry.VolNum)
+			if err != nil {
+				entry.LoadError = err
+				continue
+			}
+			//TODO: V3 Uses LZW and a 7 byte header
+			if len(vol) < int(entry.Offset+5) {
+				entry.LoadError = fmt.Errorf("Invalid Offset. Volume too short")
+				continue
+			}
+			vol = vol[entry.Offset:]
+			sig := binary.BigEndian.Uint16(vol)
+			if sig != 0x1234 {
+				entry.LoadError = fmt.Errorf("Incorrect signature at offset")
+				continue
+			}
+			size := binary.LittleEndian.Uint16(vol[3:])
+			vol = vol[5:]
+			vol = vol[:size]
+			entry.RawData = vol
+			if f != nil {
+				entry.Data, err = f(vol)
+				if err != nil {
+					entry.LoadError = err
+					continue
+				}
+			}
+		}
+	}
+	load(d.Logics, logic.New)
+	load(d.Pictures, nil)
+	load(d.Views, nil)
+	load(d.Sounds, nil)
+	return nil
+}
+
+func (d *Directory) loadVolume(n byte) ([]byte, error) {
+	if d.AgiVersion == 3 {
+		return d.l.Open(fmt.Sprintf("%sVOL.%d", d.l.Prefix(), n))
+	}
+	return d.l.Open(fmt.Sprintf("VOL.%d", n))
 }
 
 func (d *Directory) LoadV2() error {

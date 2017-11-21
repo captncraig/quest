@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strconv"
 
 	"github.com/gopherjs/gopherjs/js"
 	"github.com/gopherjs/jquery"
@@ -68,6 +69,11 @@ func loadGame(id string) {
 	directory, err = resources.LoadGameInfo(loader)
 	if err != nil {
 		alert(err)
+		return
+	}
+	if err = directory.LoadAllResources(); err != nil {
+		alert(err)
+		return
 	}
 	counts = map[string]int{}
 	for _, p := range directory.Logics {
@@ -96,21 +102,34 @@ func loadGame(id string) {
 		"game":   gameID,
 		"counts": counts,
 	})
-	jq(".sub-loader").On(jquery.CLICK, func(e jquery.Event) {
-		el := jq(e.Target).Attr("id")
-		var tpl *template.Template
-		var ctx interface{}
-		switch el {
-		case "map":
-			tpl, ctx = resourceMap, directory
-		case "words":
-			tpl, ctx = words, map[string]interface{}{"words": directory.Words, "groups": directory.WordGroups}
-		default:
+	jq(".sub-loader").On(jquery.CLICK, subLoad)
+}
+
+func subLoad(e jquery.Event) {
+	el := jq(e.Target).Attr("id")
+	var tpl *template.Template
+	var ctx interface{}
+	switch el {
+	case "map":
+		tpl, ctx = resourceMap, directory
+	case "words":
+		tpl, ctx = words, map[string]interface{}{"words": directory.Words, "groups": directory.WordGroups}
+	case "logics":
+		tpl, ctx = logics, directory.Logics
+	default:
+		if el[0] == 'l' {
+			num, err := strconv.Atoi(el[1:])
+			if err != nil {
+				alert(err)
+			}
+			tpl, ctx = logic, map[string]interface{}{"n": num, "log": directory.Logics[num].Data}
+		} else {
 			alert(fmt.Errorf("Loading %s not implemented yet", el))
 			return
 		}
-		renderContentTo(tpl, ctx, "#innerContent")
-	})
+	}
+	renderContentTo(tpl, ctx, "#innerContent")
+	jq(".logic-link").On(jquery.CLICK, subLoad)
 }
 
 var directoryTpl = tpl(`
@@ -141,16 +160,26 @@ var resourceMap = tpl(`
 		</thead>
 		<tbody>
 			{{$d := .}}
+			{{define "info"}}
+				{{if .}}
+					<td {{if .LoadError}}class='danger'{{end}}>
+						Vol{{.VolNum}} @{{hex .Offset}}
+						{{if .LoadError}}{{.LoadError}}{{else}}({{len .RawData}} bytes){{end}}
+					</td>
+				{{else}}
+					<td>-</td>
+				{{end}}
+			{{end}}
 			{{range $i,$l := .Logics}}
 				<tr>
 					{{$p := index $d.Pictures $i}}
 					{{$v := index $d.Views $i}}
 					{{$s := index $d.Sounds $i}}
 					<td>{{$i}}</td>
-					<td>{{if $l}}Vol{{$l.VolNum}} @{{hex $l.Offset}}{{else}}-{{end}}</td>
-					<td>{{if $p}}Vol{{$p.VolNum}} @{{hex $p.Offset}}{{else}}-{{end}}</td>
-					<td>{{if $v}}Vol{{$v.VolNum}} @{{hex $v.Offset}}{{else}}-{{end}}</td>
-					<td>{{if $s}}Vol{{$s.VolNum}} @{{hex $s.Offset}}{{else}}-{{end}}</td>
+					{{template "info" $l}}
+					{{template "info" $p}}
+					{{template "info" $v}}
+					{{template "info" $s}}
 				</tr>
 			{{end}}
 		</tbody>
@@ -180,7 +209,18 @@ var words = tpl(`
 `)
 var loading = tpl(`<div class='row'>Loading {{.}}...</div>`)
 var gameList = tpl(`<div class='row'><h2>Pick a Game</h2></div><div class='row'><ul>{{range .}}<li><a href="#" class='gameLink' id='{{.Name}}'>{{.Name}}</a></li>{{end}}</ul></div>`)
-
+var logics = tpl(`<h3>Logic</h3><ul>
+	{{range $i,$l := .}}{{if $l}}
+	<li><a id="l{{$i}}" class='logic-link'>{{$i}}</a></li>
+	{{end}}{{end}}
+	</ul>`)
+var logic = tpl(`<h3>Logic {{.n}}</h3>
+	<h4>Messages</h4><ul>
+	{{range $id, $msg := .log.Messages}}
+		<li>{{$id}} {{$msg}}</li>
+	{{end}}
+	</ul>
+	`)
 var funcMap = template.FuncMap{
 	"hex": func(value interface{}) string {
 		return fmt.Sprintf("0x%x", value)
