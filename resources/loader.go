@@ -38,6 +38,7 @@ type httpLoader struct {
 
 func (h *httpLoader) Open(fname string) ([]byte, error) {
 	fullURL := h.baseAddr + "/" + fname
+	fmt.Println(fullURL)
 	resp, err := http.Get(fullURL)
 	if err != nil {
 		return nil, err
@@ -69,6 +70,7 @@ func (c *cacheLoader) Open(fname string) ([]byte, error) {
 		return c.cache[fname], nil
 	}
 	// try all case combinations since files seem pretty inconsistent in practice
+	// TODO: remove duplicates
 	toTry := []string{
 		fname,
 		strings.ToUpper(fname),

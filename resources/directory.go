@@ -21,6 +21,7 @@ type Directory struct {
 	Views          []*IndexEntry
 	Sounds         []*IndexEntry
 	Words          map[string]uint16
+	WordGroups     map[uint16][]string
 	l              Loader
 }
 
@@ -103,7 +104,6 @@ func (d *Directory) LoadV3() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(len(dat))
 	if len(dat) < 8 {
 		return fmt.Errorf("%s should be at least 8 bytes long. Got %d", fname, len(dat))
 	}
@@ -154,6 +154,7 @@ func (d *Directory) loadWords() error {
 		return err
 	}
 	d.Words = map[string]uint16{}
+	d.WordGroups = map[uint16][]string{}
 	dat = dat[52:]
 	word := []byte{}
 	for len(dat) > 4 {
@@ -171,9 +172,10 @@ func (d *Directory) loadWords() error {
 				break
 			}
 		}
-		d.Words[string(word)] = binary.BigEndian.Uint16(dat)
+		i, w := binary.BigEndian.Uint16(dat), string(word)
+		d.Words[w] = i
+		d.WordGroups[i] = append(d.WordGroups[i], w)
 		dat = dat[2:]
 	}
-	fmt.Println(d.Words)
 	return nil
 }
