@@ -58,12 +58,14 @@ func parse(raw []byte) ([]Stmt, error) {
 	for d.has() {
 		st, err := parseStmt(d)
 		if err != nil {
+			log.Fatal(err)
 			return nil, err
 		}
 		s = append(s, st)
 	}
 	return s, nil
 }
+
 func parseStmt(d *dispenser) (s Stmt, err error) {
 	addr := d.idx
 	defer func() {
@@ -95,8 +97,7 @@ func parseStmt(d *dispenser) (s Stmt, err error) {
 			}
 			return ost, nil
 		}
-		log.Fatalf("Unknown Stmt Opcode %x", op)
-		return nil, nil
+		return nil, fmt.Errorf("Unknown Stmt Opcode %x", op)
 	}
 }
 func parseIf(d *dispenser) (Stmt, error) {
@@ -165,7 +166,7 @@ func parseSingleCondition(d *dispenser) (Condition, error) {
 		return &notCondition{other: next}, nil
 	default:
 		if opc, ok := conditionalOpCodes[op]; ok {
-			co := conditionalOp{op: opc}
+			co := &conditionalOp{op: opc}
 			for i := 0; i < len(opc.Args); i++ {
 				co.args = append(co.args, d.take())
 			}
@@ -174,26 +175,65 @@ func parseSingleCondition(d *dispenser) (Condition, error) {
 					co.args = append(co.args, d.take())
 				}
 			}
-			return opc, nil
+			return co, nil
 		}
 		return nil, fmt.Errorf("Unknown Condition Opcode %x", op)
 	}
 }
-func printStmt(s Stmt) string {
 
+func printStmt(s Stmt) string {
 	switch t := s.(type) {
 	case *opStmt:
+		if p := printers[t.op.Name]; p != nil {
+			return p(t.args)
+		}
 		args := []string{}
-		for _, b := range t.args {
-			args = append(args, fmt.Sprint(b))
+		for i, b := range t.args {
+			args = append(args, printArg(t.op.Args[i], b))
 		}
 		return fmt.Sprintf("%s(%s)", t.op.Name, strings.Join(args, ","))
 	case *ifStmt:
-		return "if(???)"
+		return fmt.Sprintf("if(%s)", printCond(t.Condition))
 	case *gotoStmt:
 		return fmt.Sprintf("goto %x", int16(t.Offset))
 	default:
 		log.Fatalf("printstmt unknown %T", s)
+	}
+	return "???"
+}
+
+func printCond(c Condition) string {
+	switch t := c.(type) {
+	case *conditionalOp:
+		if p := printers[t.op.Name]; p != nil {
+			return p(t.args)
+		}
+		args := []string{}
+		for i, b := range t.args {
+			//TODO: said is special
+			if t.op.Name == "said" {
+				args = append(args, fmt.Sprint(b))
+			} else {
+				args = append(args, printArg(t.op.Args[i], b))
+			}
+		}
+		return fmt.Sprintf("%s(%s)", t.op.Name, strings.Join(args, ","))
+	case *notCondition:
+		return fmt.Sprintf("!%s", printCond(t.other))
+	case andCondition:
+		parts := []string{}
+		for _, x := range t {
+			parts = append(parts, printCond(x))
+		}
+		return strings.Join(parts, " && ")
+	case orCondition:
+		parts := []string{}
+		for _, x := range t {
+			parts = append(parts, printCond(x))
+		}
+		return "(" + strings.Join(parts, " || ") + ")"
+	default:
+		log.Fatalf("printcond unknown %T", t)
 	}
 	return "???"
 }

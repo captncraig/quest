@@ -2,12 +2,12 @@ package logic
 
 import (
 	"encoding/binary"
-	"fmt"
 )
 
 type Logic struct {
 	Messages     map[byte]string
 	Instructions []byte
+	Stmts        []Stmt
 }
 
 func New(raw []byte) (interface{}, error) {
@@ -15,7 +15,11 @@ func New(raw []byte) (interface{}, error) {
 	textStart := binary.LittleEndian.Uint16(raw) + 2
 	l.Messages = decodeMessages(raw[textStart:])
 	l.Instructions = raw[2:textStart]
-	fmt.Println(parse(l.Instructions))
+	stmts, err := parse(l.Instructions)
+	if err != nil {
+		return nil, err
+	}
+	l.Stmts = stmts
 	return l, nil
 }
 

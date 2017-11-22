@@ -59,7 +59,7 @@ func LoadGameInfo(l Loader) (*Directory, error) {
 
 func (d *Directory) LoadAllResources() error {
 	var load = func(idx []*IndexEntry, f func([]byte) (interface{}, error)) {
-		for _, entry := range idx {
+		for i, entry := range idx {
 			if entry == nil {
 				continue
 			}
@@ -84,6 +84,7 @@ func (d *Directory) LoadAllResources() error {
 			vol = vol[:size]
 			entry.RawData = vol
 			if f != nil {
+				fmt.Println("!!!!!!!", i)
 				entry.Data, err = f(vol)
 				if err != nil {
 					entry.LoadError = err
