@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	l := resources.NewHttpLoader(`https://captncraig.github.io/quest/games/kq1`)
+	l := resources.NewFileLoader(`docs/games/kq1`)
 	dir, err := resources.LoadGameInfo(l)
 	if err != nil {
 		log.Fatal(err)

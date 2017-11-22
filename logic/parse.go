@@ -95,7 +95,8 @@ func parseStmt(d *dispenser) (s Stmt, err error) {
 			}
 			return ost, nil
 		}
-		return nil, fmt.Errorf("Unknown Stmt Opcode %x", op)
+		log.Fatalf("Unknown Stmt Opcode %x", op)
+		return nil, nil
 	}
 }
 func parseIf(d *dispenser) (Stmt, error) {
