@@ -38,7 +38,7 @@ type httpLoader struct {
 
 func (h *httpLoader) Open(fname string) ([]byte, error) {
 	fullURL := h.baseAddr + "/" + fname
-	fmt.Println(fullURL)
+	//fmt.Println(fullURL)
 	resp, err := http.Get(fullURL)
 	if err != nil {
 		return nil, err

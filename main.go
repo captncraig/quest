@@ -14,4 +14,5 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Println(dir.LongAgiVersion, dir.AgiVersion)
+	dir.LoadAllResources()
 }

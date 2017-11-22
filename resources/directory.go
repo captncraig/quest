@@ -90,6 +90,7 @@ func (d *Directory) LoadAllResources() error {
 					continue
 				}
 			}
+			break
 		}
 	}
 	load(d.Logics, logic.New)
