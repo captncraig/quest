@@ -1,16 +1,23 @@
 import { Loader } from "./loader";
 import * as log from './logger';
+import {Entry} from './baseEntry';
+import { Picture } from "./pictures";
+import { Screen } from "./screen";
 
-export interface Entry{
-    VolNum: number;
-    Offset: number;
+
+
+export class View extends Entry{
+}
+export class Logic extends Entry{
+}
+export class Sound extends Entry{
 }
 
 export class Dir{
-    public Pictures: Entry[];
-    public Views: Entry[];
-    public Sounds: Entry[];
-    public Logics: Entry[];
+    public Pictures: Picture[];
+    public Views: View[];
+    public Sounds: Sound[];
+    public Logics: Logic[];
 
     public constructor(private loader: Loader, private v3Prefix: string){}
     public async Load(){
@@ -20,25 +27,32 @@ export class Dir{
             await this.loadV3();
         }
     }
+
     private async loadV2(){
-        this.Logics = this.loadEntries(await this.loader.load("LOGDIR"))
-        console.log(this.Logics)
+        this.Logics = this.loadEntries(Logic, await this.loader.load("LOGDIR"));
+        this.Views = this.loadEntries(View, await this.loader.load("VIEWDIR"));
+        this.Pictures = this.loadEntries(Picture, await this.loader.load("PICDIR"));
+        this.Sounds = this.loadEntries(Sound, await this.loader.load("SNDDIR"));
+
+        var canvas = document.getElementById("screen") as HTMLCanvasElement;
+        var ctx = canvas.getContext("2d");
+        var viz = new Screen(160,200);
+        viz.ctx2d = ctx;
+        var prio = new Screen(160,200);
+        await this.Pictures[1].Draw(viz,prio);
     }
-    private loadEntries(dat: Uint8Array): Entry[]{
+    private loadEntries<T extends Entry>(c: {new(vnum: number, offset: number, l: Loader): T; },dat: Uint8Array): T[]{
         if (dat.length == 0 || dat.length % 3 != 0){
             throw("Invalid data length")
         }
-        var arr = new Array<Entry>(256)
+        var arr = new Array<T>(256)
         for (var num = 0; num < dat.length / 3; num++){
             var i = num*3;
             var offset = (dat[i] << 16) | (dat[i+1] << 8) | dat[i+2];
             if (offset == 0xffffff){
                 continue;
             }
-            arr[num] ={
-                VolNum: offset >> 20,      // top 4 bits
-                Offset: offset & 0x0fffff, // bottom 20 bits
-            } 
+            arr[num] = new c(offset >> 20, offset & 0x0fffff, this.loader);
         }
         return arr;
     }
